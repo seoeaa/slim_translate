@@ -137,6 +137,13 @@ class _TranslateScreenState extends ConsumerState<TranslateScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.record_voice_over, size: 24),
+                    onPressed: () => context.push('/tts'),
+                    color: Colors.grey[700],
+                    tooltip: 'Озвучка текста',
+                  ),
                 ],
               ),
             ),
