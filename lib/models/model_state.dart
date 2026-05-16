@@ -1,5 +1,7 @@
 enum ModelLoadStatus { notDownloaded, downloading, downloaded, loading, loaded, error }
 
+enum ModelFamily { hy, minicpmv }
+
 class ModelInfo {
   final String id;
   final String name;
@@ -7,6 +9,7 @@ class ModelInfo {
   final String hfRepo;
   final String fileName;
   final String description;
+  final ModelFamily family;
 
   const ModelInfo({
     required this.id,
@@ -15,6 +18,7 @@ class ModelInfo {
     required this.hfRepo,
     required this.fileName,
     required this.description,
+    this.family = ModelFamily.hy,
   });
 }
 

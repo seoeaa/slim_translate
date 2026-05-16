@@ -49,6 +49,34 @@ class ModelNotifier extends Notifier<ModelState> {
       fileName: 'HY-MT1.5-1.8B-Q8_0.gguf',
       description: '8-бит. Максимальное качество.',
     ),
+    // MiniCPM-V-4.6 (multimodal, qwen35 arch)
+    ModelInfo(
+      id: 'openbmb/MiniCPM-V-4.6-gguf',
+      name: 'MiniCPM-V Q4_K_M — ~800 MB',
+      size: '~800 MB',
+      hfRepo: 'openbmb/MiniCPM-V-4.6-gguf',
+      fileName: 'MiniCPM-V-4_6-Q4_K_M.gguf',
+      description: 'MiniCPM-V 4.6 Q4_K_M. Multimodal, архитектура Qwen.',
+      family: ModelFamily.minicpmv,
+    ),
+    ModelInfo(
+      id: 'openbmb/MiniCPM-V-4.6-gguf',
+      name: 'MiniCPM-V Q5_K_M — ~1 ГБ',
+      size: '~1 GB',
+      hfRepo: 'openbmb/MiniCPM-V-4.6-gguf',
+      fileName: 'MiniCPM-V-4_6-Q5_K_M.gguf',
+      description: 'MiniCPM-V 4.6 Q5_K_M. Лучшее качество.',
+      family: ModelFamily.minicpmv,
+    ),
+    ModelInfo(
+      id: 'openbmb/MiniCPM-V-4.6-gguf',
+      name: 'MiniCPM-V Q8_0 — ~1.4 ГБ',
+      size: '~1.4 GB',
+      hfRepo: 'openbmb/MiniCPM-V-4.6-gguf',
+      fileName: 'MiniCPM-V-4_6-Q8_0.gguf',
+      description: 'MiniCPM-V 4.6 Q8_0. Максимальное качество.',
+      family: ModelFamily.minicpmv,
+    ),
   ];
 
   @override
@@ -66,8 +94,9 @@ class ModelNotifier extends Notifier<ModelState> {
       final engine = ref.read(translationEngineProvider);
 
       final ok = await engine.downloadAndLoad(
-        modelId: model.id,
+        modelId: model.hfRepo,
         fileName: model.fileName,
+        family: model.family,
         nThreads: 4,
         nCtx: 2048,
         onProgress: (progress, status) {

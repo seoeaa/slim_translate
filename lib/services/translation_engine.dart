@@ -4,6 +4,7 @@ import 'package:flutter_llama/flutter_llama.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import '../models/language_pair.dart';
+import '../models/model_state.dart';
 
 typedef ProgressCallback = void Function(double progress, String status);
 
@@ -11,6 +12,7 @@ class HyMTEngine {
   final _llama = FlutterLlama.instance;
   bool _isInitialized = false;
   bool _isTranslating = false;
+  ModelFamily _family = ModelFamily.hy;
 
   bool get isLoaded => _isInitialized;
 
@@ -21,6 +23,7 @@ class HyMTEngine {
 
   Future<void> _forceUnload() async {
     _isTranslating = false;
+    _family = ModelFamily.hy;
     if (_isInitialized) {
       try {
         await _llama.unloadModel();
@@ -59,10 +62,12 @@ class HyMTEngine {
     required String modelId,
     required String fileName,
     required ProgressCallback onProgress,
+    ModelFamily family = ModelFamily.hy,
     int nThreads = 4,
     int nCtx = 1024,
   }) async {
     await _forceUnload();
+    _family = family;
 
     final localPath = await _downloadModelHttp(
       hfRepo: modelId,
@@ -190,6 +195,13 @@ class HyMTEngine {
   }
 
   String _buildPrompt(String sourceText, Language sourceLang, Language targetLang) {
+    if (_family == ModelFamily.minicpmv) {
+      return _buildChatMLPrompt(sourceText, sourceLang, targetLang);
+    }
+    return _buildHyPrompt(sourceText, sourceLang, targetLang);
+  }
+
+  String _buildHyPrompt(String sourceText, Language sourceLang, Language targetLang) {
     final hasChinese = sourceLang == Language.chinese || targetLang == Language.chinese;
     String instruction;
 
@@ -200,6 +212,12 @@ class HyMTEngine {
     }
 
     return '$_bos$_user$instruction\n\n$sourceText$_eos$_assistant';
+  }
+
+  String _buildChatMLPrompt(String sourceText, Language sourceLang, Language targetLang) {
+    final instruction = 'Translate the following text into ${targetLang.englishName}. Output ONLY the translation, nothing else:\n\n$sourceText';
+
+    return '<|im_start|>user\n$instruction<|im_end|>\n<|im_start|>assistant\n';
   }
 
   Stream<String> translate(String text, LanguagePair languagePair) async* {
@@ -251,6 +269,24 @@ extension TranslationCleanup on String {
     s = s.replaceAll('<｜hy_User｜>', '');
     s = s.replaceAll('<｜hy_Assistant｜>', '');
     s = s.replaceAll('<｜hy_place▁holder▁no▁2｜>', '');
+    s = s.replaceAll('<|im_start|>', '');
+    s = s.replaceAll('<|im_end|>', '');
+    s = s.replaceAll('<|im_sep|>', '');
+
+    if (s.contains('<|image_pad|>')) {
+      s = s.replaceAll(RegExp(r'<\|image_pad\|>'), '');
+    }
+
+    final thinkingMatch = RegExp(r'<think\b[^>]*>([\s\S]*?)</think\s*>').firstMatch(s);
+    if (thinkingMatch != null) {
+      s = s.replaceRange(thinkingMatch.start, thinkingMatch.end, '');
+    }
+    s = s.replaceAll(RegExp(r'<think\b[^>]*>[\s\S]*$'), '');
+
+    s = s.replaceAll(RegExp(r'^[\s\S]*?\n\n'), '');
+    if (s.startsWith('Translation:')) {
+      s = s.substring('Translation:'.length).trim();
+    }
 
     return s.trim();
   }
