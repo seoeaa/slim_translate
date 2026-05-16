@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter_llama/flutter_llama.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import '../models/language_pair.dart';
 
 typedef ProgressCallback = void Function(double progress, String status);
@@ -16,8 +19,27 @@ class HyMTEngine {
   static const _user = '<｜hy_User｜>';
   static const _assistant = '<｜hy_Assistant｜>';
 
+  Future<void> _forceUnload() async {
+    _isTranslating = false;
+    if (_isInitialized) {
+      try {
+        await _llama.unloadModel();
+      } catch (_) {}
+      _isInitialized = false;
+    }
+  }
+
+  Future<String> get _modelDir async {
+    final dir = await getApplicationDocumentsDirectory();
+    final modelDir = Directory('${dir.path}/models');
+    if (!modelDir.existsSync()) {
+      await modelDir.create(recursive: true);
+    }
+    return modelDir.path;
+  }
+
   Future<bool> initialize(String modelPath, {int nThreads = 4, int nCtx = 4096}) async {
-    if (_isInitialized) return true;
+    await _forceUnload();
 
     final config = LlamaConfig(
       modelPath: modelPath,
@@ -40,8 +62,99 @@ class HyMTEngine {
     int nThreads = 4,
     int nCtx = 1024,
   }) async {
+    await _forceUnload();
+
+    final localPath = await _downloadModelHttp(
+      hfRepo: modelId,
+      fileName: fileName,
+      onProgress: onProgress,
+    );
+
+    if (localPath == null) {
+      onProgress(0, 'HTTP не удалось, пробуем через плагин...');
+      return _downloadAndLoadPlugin(modelId, fileName, onProgress, nThreads, nCtx);
+    }
+
+    onProgress(0.95, 'Загрузка модели в память...');
+    final config = LlamaConfig(
+      modelPath: localPath,
+      nThreads: nThreads,
+      nGpuLayers: 0,
+      contextSize: nCtx,
+      batchSize: 512,
+      useGpu: false,
+      verbose: false,
+    );
+
+    _isInitialized = await _llama.loadModel(config);
+    if (_isInitialized) {
+      onProgress(1.0, 'Готово');
+    }
+    return _isInitialized;
+  }
+
+  Future<String?> _downloadModelHttp({
+    required String hfRepo,
+    required String fileName,
+    required ProgressCallback onProgress,
+  }) async {
+    final dir = await _modelDir;
+    final localFile = File('$dir/$fileName');
+
+    if (localFile.existsSync() && localFile.lengthSync() > 1024 * 1024) {
+      onProgress(0.9, 'Модель уже скачана');
+      return localFile.path;
+    }
+
+    final url = 'https://huggingface.co/$hfRepo/resolve/main/$fileName';
+
     try {
-      onProgress(0, 'Загрузка модели...');
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        client.close();
+        return null;
+      }
+
+      final total = response.contentLength ?? 0;
+      int received = 0;
+
+      final raf = await localFile.open(mode: FileMode.write);
+      await for (final chunk in response.stream) {
+        received += chunk.length;
+        await raf.writeFrom(chunk);
+        if (total > 0) {
+          onProgress(received / total * 0.9, 'Скачивание: ${(received / total * 100).toStringAsFixed(0)}%');
+        }
+      }
+      await raf.close();
+      client.close();
+
+      if (!localFile.existsSync() || localFile.lengthSync() < 1024 * 1024) {
+        await localFile.delete().catchError((_) => localFile);
+        return null;
+      }
+
+      return localFile.path;
+    } catch (e) {
+      if (localFile.existsSync()) {
+        await localFile.delete().catchError((_) => localFile);
+      }
+      return null;
+    }
+  }
+
+  Future<bool> _downloadAndLoadPlugin(
+    String modelId,
+    String fileName,
+    ProgressCallback onProgress,
+    int nThreads,
+    int nCtx,
+  ) async {
+    try {
+      onProgress(0, 'Загрузка через плагин...');
 
       await _llama.loadModelWithAutoDownload(
         modelId: modelId,
@@ -125,11 +238,7 @@ class HyMTEngine {
   }
 
   Future<void> dispose() async {
-    _isTranslating = false;
-    if (_isInitialized) {
-      await _llama.unloadModel();
-      _isInitialized = false;
-    }
+    await _forceUnload();
   }
 }
 

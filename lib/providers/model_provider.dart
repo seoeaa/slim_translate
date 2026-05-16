@@ -85,7 +85,7 @@ class ModelNotifier extends Notifier<ModelState> {
       if (!ok) {
         state = state.copyWith(
           status: ModelLoadStatus.error,
-          errorMessage: 'Не удалось загрузить модель. Попробуйте другую версию (Q4_K_M).',
+          errorMessage: 'Не удалось загрузить модель. Попробуйте другую.',
         );
       }
     } catch (e) {
