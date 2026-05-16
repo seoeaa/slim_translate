@@ -69,53 +69,44 @@ class HyMTEngine {
     await _forceUnload();
     _family = family;
 
-    for (var attempt = 0; attempt < 2; attempt++) {
-      final localPath = await _downloadModelHttp(
-        hfRepo: modelId,
-        fileName: fileName,
-        onProgress: onProgress,
-        forceRedownload: attempt > 0,
-      );
+    final localPath = await _downloadModelHttp(
+      hfRepo: modelId,
+      fileName: fileName,
+      onProgress: onProgress,
+    );
 
-      if (localPath == null) {
-        onProgress(0, 'HTTP не удалось, пробуем через плагин...');
-        return _downloadAndLoadPlugin(modelId, fileName, onProgress, nThreads, nCtx);
-      }
-
-      onProgress(0.95, 'Загрузка модели в память...');
-      final config = LlamaConfig(
-        modelPath: localPath,
-        nThreads: nThreads,
-        nGpuLayers: 0,
-        contextSize: nCtx,
-        batchSize: 512,
-        useGpu: false,
-        verbose: false,
-      );
-
-      _isInitialized = await _llama.loadModel(config);
-      if (_isInitialized) {
-        onProgress(1.0, 'Готово');
-        return true;
-      }
-
-      await File(localPath).delete().catchError((_) => File(localPath));
-      onProgress(0, 'Файл повреждён, перескачивание...');
+    if (localPath == null) {
+      onProgress(0, 'HTTP не удалось, пробуем через плагин...');
+      return _downloadAndLoadPlugin(modelId, fileName, onProgress, nThreads, nCtx);
     }
 
-    return false;
+    onProgress(0.95, 'Загрузка модели в память...');
+    final config = LlamaConfig(
+      modelPath: localPath,
+      nThreads: nThreads,
+      nGpuLayers: 0,
+      contextSize: nCtx,
+      batchSize: 512,
+      useGpu: false,
+      verbose: false,
+    );
+
+    _isInitialized = await _llama.loadModel(config);
+    if (_isInitialized) {
+      onProgress(1.0, 'Готово');
+    }
+    return _isInitialized;
   }
 
   Future<String?> _downloadModelHttp({
     required String hfRepo,
     required String fileName,
     required ProgressCallback onProgress,
-    bool forceRedownload = false,
   }) async {
     final dir = await _modelDir;
     final localFile = File('$dir/$fileName');
 
-    if (!forceRedownload && localFile.existsSync() && localFile.lengthSync() > 1024 * 1024) {
+    if (localFile.existsSync() && localFile.lengthSync() > 1024 * 1024) {
       onProgress(0.9, 'Модель уже скачана');
       return localFile.path;
     }
