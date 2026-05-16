@@ -50,23 +50,31 @@ class _TtsScreenState extends State<TtsScreen> {
     });
 
     try {
+      print('[TTS] Starting download...');
       final dir = await TtsDownloader.ensureDownloaded((progress, status) {
+        print('[TTS] Download: ${(progress * 100).toStringAsFixed(0)}% - $status');
         setState(() {
           _downloadProgress = progress;
           _status = status;
         });
       });
 
+      print('[TTS] Download complete, loading ONNX from $dir');
       setState(() => _status = 'Загрузка ONNX сессий...');
 
       _tts = await loadTextToSpeech(dir);
+      print('[TTS] TTS engine loaded');
+
       _style = await loadVoiceStyle(dir, _selectedVoice);
+      print('[TTS] Voice style loaded');
 
       setState(() {
         _isLoading = false;
         _status = 'Готово';
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[TTS] ERROR: $e');
+      print('[TTS] Stack: $stackTrace');
       setState(() {
         _isLoading = false;
         _status = 'Ошибка: $e';

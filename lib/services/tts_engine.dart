@@ -452,10 +452,10 @@ Future<TextToSpeech> loadTextToSpeech(String modelDir) async {
   final cfgs = jsonDecode(File('$onnxDir/tts.json').readAsStringSync()) as Map<String, dynamic>;
   final ort = OnnxRuntime();
   final sessions = await Future.wait([
-    ort.createSessionFromAsset('$onnxDir/duration_predictor.onnx'),
-    ort.createSessionFromAsset('$onnxDir/text_encoder.onnx'),
-    ort.createSessionFromAsset('$onnxDir/vector_estimator.onnx'),
-    ort.createSessionFromAsset('$onnxDir/vocoder.onnx'),
+    ort.createSession('$onnxDir/duration_predictor.onnx'),
+    ort.createSession('$onnxDir/text_encoder.onnx'),
+    ort.createSession('$onnxDir/vector_estimator.onnx'),
+    ort.createSession('$onnxDir/vocoder.onnx'),
   ]);
   final textProcessor = await UnicodeProcessor.load('$onnxDir/unicode_indexer.json');
 
